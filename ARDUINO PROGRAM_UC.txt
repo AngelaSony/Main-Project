@@ -1,0 +1,123 @@
+///////////////////////////////////////SERIAL COMMUNICATION
+#include <SoftwareSerial.h>
+SoftwareSerial espSerial(9, 10);//(rx,tx)
+
+int Fan_PWM =6;
+int Fan_IN3 =5;
+int Fan_IN4 =4;
+///////////////////////////////////////TEMP
+#include <DHT.h>
+#define DHTPIN 7        
+#define DHTTYPE DHT11     // DHT 11
+DHT dht(DHTPIN, DHTTYPE);
+float Air_Temp;
+float Air_Humidity;
+
+#include <OneWire.h>
+#include <DallasTemperature.h>
+const int oneWireBus = 3;     
+OneWire oneWire(oneWireBus);
+DallasTemperature sensors(&oneWire);
+float Body_Temp ;
+//////////////////////////////////////////////
+int Fan_Speed;
+
+int Mode_Data_Pin=2;
+int Fan_Data_Pin=8;
+
+void setup() {
+
+Serial.begin(115200);
+espSerial.begin(115200);
+delay(100); 
+dht.begin();
+delay(100);
+sensors.begin();
+
+pinMode(Mode_Data_Pin,INPUT);
+pinMode(Fan_Data_Pin,INPUT);
+
+pinMode(Fan_PWM ,OUTPUT);
+pinMode(Fan_IN3 ,OUTPUT);
+pinMode(Fan_IN4 ,OUTPUT);
+
+}
+
+void loop() {
+////////////////////////////////////////////////////TEMP DETECTION
+Air_Temp = dht.readTemperature(); 
+Air_Humidity = dht.readHumidity(); 
+sensors.requestTemperatures(); 
+Body_Temp = sensors.getTempCByIndex(0);
+
+
+///////////////////////////////////////////AUTOMATIC MODE///////////////////////////////////
+if(digitalRead(Mode_Data_Pin)==HIGH){
+Serial.print("AUTOMATIC MODE ");
+
+////////////////////////////////////////////////////FAN SPEED USING DS18b20
+ if(digitalRead(Fan_Data_Pin)==HIGH){
+Fan_Speed=map(Body_Temp,25,40,0,255);
+if(Fan_Speed<40){
+  Fan_Speed=40;
+}
+if(Fan_Speed>255){
+   Fan_Speed=255;
+}
+analogWrite(Fan_PWM,Fan_Speed);
+digitalWrite(Fan_IN3,LOW);
+digitalWrite(Fan_IN4,HIGH);
+}
+ if(digitalRead(Fan_Data_Pin)==LOW){
+  analogWrite(Fan_PWM,0);
+  digitalWrite(Fan_IN3,LOW);
+  digitalWrite(Fan_IN4,LOW); 
+ }
+}
+
+
+///////////////////////////////////////////REMOTE MODE//////////////////////////////////////
+if(digitalRead(Mode_Data_Pin)==LOW){
+Serial.print("REMOTE MODE ");  
+
+  if(digitalRead(Fan_Data_Pin)==HIGH){
+  Serial.print("  FAN ON: 255 ");  
+  analogWrite(Fan_PWM,255);
+  digitalWrite(Fan_IN3,LOW);
+  digitalWrite(Fan_IN4,HIGH);
+  }
+  if(digitalRead(Fan_Data_Pin)==LOW){
+  Serial.print("  FAN OFF: 0 ");  
+  analogWrite(Fan_PWM,0);
+  digitalWrite(Fan_IN3,LOW);
+  digitalWrite(Fan_IN4,LOW);
+  }
+  
+}
+
+Serial.println(" ");  
+
+
+Print_Data();
+Data_Esp();
+delay(1000);
+}
+
+
+void Print_Data(){
+  Serial.print("Air_Temp: ");
+  Serial.print(Air_Temp);
+  Serial.print("   Air_Humidity: ");
+  Serial.print(Air_Humidity);
+  Serial.print("   Fan_Speed_PWM: ");
+  Serial.print(Fan_Speed);
+
+  Serial.print("   DS18B20_Temp : ");
+  Serial.println(Body_Temp);
+}
+
+void Data_Esp(){
+ Serial.print("Data TO ESP: ");
+ Serial.println(String(Air_Temp)+","+String(Air_Humidity)+","+String(Fan_Speed)+","+String(Body_Temp));
+ espSerial.println(String(Air_Temp)+","+String(Air_Humidity)+","+String(Fan_Speed)+","+String(Body_Temp)); 
+}
